@@ -47,7 +47,9 @@ namespace GildedRose;
  */
 class Program
 {
-    private $items = array();
+    public $items = array();
+    private $maxQuality = 50;
+    private $minQuality = 0;
 
     public static function Main($days = 1)
     {
@@ -84,53 +86,124 @@ class Program
     public function UpdateQuality()
     {
         for ($i = 0; $i < count($this->items); $i++) {
-            if ($this->items[$i]->name != "Aged Brie" && $this->items[$i]->name != "Backstage passes to a TAFKAL80ETC concert") {
-                if ($this->items[$i]->quality > 0) {
-                    if ($this->items[$i]->name != "Sulfuras, Hand of Ragnaros") {
-                        $this->items[$i]->quality = $this->items[$i]->quality - 1;
-                    }
-                }
-            } else {
-                if ($this->items[$i]->quality < 50) {
-                    $this->items[$i]->quality = $this->items[$i]->quality + 1;
-
-                    if ($this->items[$i]->name == "Backstage passes to a TAFKAL80ETC concert") {
-                        if ($this->items[$i]->sellIn < 11) {
-                            if ($this->items[$i]->quality < 50) {
-                                $this->items[$i]->quality = $this->items[$i]->quality + 1;
-                            }
-                        }
-
-                        if ($this->items[$i]->sellIn < 6) {
-                            if ($this->items[$i]->quality < 50) {
-                                $this->items[$i]->quality = $this->items[$i]->quality + 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if ($this->items[$i]->name != "Sulfuras, Hand of Ragnaros") {
-                $this->items[$i]->sellIn = $this->items[$i]->sellIn - 1;
-            }
-
-            if ($this->items[$i]->sellIn < 0) {
-                if ($this->items[$i]->name != "Aged Brie") {
-                    if ($this->items[$i]->name != "Backstage passes to a TAFKAL80ETC concert") {
-                        if ($this->items[$i]->quality > 0) {
-                            if ($this->items[$i]->name != "Sulfuras, Hand of Ragnaros") {
-                                $this->items[$i]->quality = $this->items[$i]->quality - 1;
-                            }
-                        }
-                    } else {
-                        $this->items[$i]->quality = $this->items[$i]->quality - $this->items[$i]->quality;
-                    }
-                } else {
-                    if ($this->items[$i]->quality < 50) {
-                        $this->items[$i]->quality = $this->items[$i]->quality + 1;
-                    }
-                }
-            }
+            $this->items[$i] = $this->updateQualityOfItem($this->items[$i]);
         }
     }
+
+    /**
+     * Immutable function that updates the quality and sellby for just one item for one day
+     *
+     * @param Item $item
+     * @return Item
+     */
+    private function updateQualityOfItem(Item $item){
+
+        switch ($item->name){
+            case "Aged Brie":
+                $item = $this->updateAgedBrie($item);
+                break;
+            case "Backstage passes to a TAFKAL80ETC concert":
+                $item = $this->updateBackstagePass($item);
+                break;
+            case "Sulfuras, Hand of Ragnaros":
+                // Legendary items don't need updating
+                break;
+            case "Conjured":
+                $item = $this->updateConjuredItem($item);
+                break;
+            default:
+                $item = $this->updateNormalItem($item);
+                break;
+        }
+
+        return $item;
+    }
+
+    private function decrementQuality($quality){
+        if ($quality > $this->minQuality) {
+            $quality--;
+        }
+        return $quality;
+    }
+    private function incrementQuality($quality){
+        if ($quality < $this->maxQuality) {
+            $quality++;
+        }
+        return $quality;
+    }
+
+    private function decrementSellIn($sellIn)
+    {
+        return $sellIn - 1;
+    }
+
+    private function isExpired(Item $item)
+    {
+        return $item->sellIn < 0;
+    }
+
+
+    private function updateAgedBrie(Item $item)
+    {
+        if($item->name == "Aged Brie"){
+            $item->quality = $this->incrementQuality($item->quality);
+            $item->sellIn = $this->decrementSellIn($item->sellIn);
+            if($this->isExpired($item)){
+                $item->quality = $this->incrementQuality($item->quality);
+            }
+        }
+
+        return $item;
+    }
+    private function updateBackstagePass(Item $item)
+    {
+        if($item->name == "Backstage passes to a TAFKAL80ETC concert"){
+            $item->quality = $this->incrementQuality($item->quality);
+
+            if ($item->sellIn < 11) {
+                $item->quality = $this->incrementQuality($item->quality);
+            }
+
+            if ($item->sellIn < 6) {
+                $item->quality = $this->incrementQuality($item->quality);
+            }
+
+            $item->sellIn = $this->decrementSellIn($item->sellIn);
+
+            if ($this->isExpired($item)) {
+                $item->quality = 0;
+            }
+        }
+
+        return $item;
+    }
+
+    private function updateNormalItem(Item $item)
+    {
+        $item->quality = $this->decrementQuality($item->quality);
+        $item->sellIn = $this->decrementSellIn($item->sellIn);
+
+        if ($this->isExpired($item)) {
+            $item->quality = $this->decrementQuality($item->quality);
+        }
+
+        return $item;
+    }
+
+    private function updateConjuredItem(Item $item)
+    {
+        if($item->name == "Conjured") {
+            $item->quality = $this->decrementQuality($item->quality);
+            $item->quality = $this->decrementQuality($item->quality);
+            $item->sellIn = $this->decrementSellIn($item->sellIn);
+
+            if ($this->isExpired($item)) {
+                $item->quality = $this->decrementQuality($item->quality);
+                $item->quality = $this->decrementQuality($item->quality);
+            }
+        }
+        return $item;
+    }
+
+
 }
